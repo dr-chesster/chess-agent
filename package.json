@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "@ethersphere/bee-js": "^2.1.0",
-    "@nestjs/common": "^8.0.0",
+    "@nestjs/common": "^8.1.2",
     "@nestjs/config": "^1.0.3",
     "@nestjs/core": "^8.0.0",
     "@nestjs/platform-express": "^8.0.0",

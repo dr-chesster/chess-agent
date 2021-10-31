@@ -8,9 +8,9 @@ export class ChessTreeController {
 
   @Post('check-mate')
   async checkMate(@Body() chessStateDto: ChessStateDto): Promise<void> {
-    const { fen, history } = chessStateDto;
+    const { fen, history, winner  } = chessStateDto;
 
-    await this.chessTreeService.updateTree(fen, history);
+    await this.chessTreeService.updateTree(fen, history, winner);
   }
 
   @Post('step')
