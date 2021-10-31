@@ -1,3 +1,4 @@
+import { Utils } from '@ethersphere/bee-js';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SepaTreeFork, SepaTreeNode } from 'sepatree';
@@ -5,6 +6,7 @@ import { stringToUint8Array, uint8ArrayToString } from 'src/utils';
 import { SepatreeService } from '../sepatree/sepatree.service';
 
 const PATH_SEPARATOR = '/';
+const { bytesToHex } = Utils;
 
 interface NodeMetadata {
   whiteWins: number;
@@ -29,10 +31,11 @@ export class ChessTreeService {
     history: string[],
   ): Promise<{ restPath: string; foundPath: string }> {
     const path = this.getNodePathFromHistory(history);
-    Logger.log(`init path ${path}`);
+    Logger.log(`init path0 ${path}, ${Object.keys(node.forks)}`);
     const restPath = await this.sepatreeService.loadUntilPath(node, path);
 
     const foundPath = path.substr(0, path.length - restPath.length);
+    Logger.log(`init path1 ${path}, ${Object.keys(node.forks)}`);
 
     return { restPath, foundPath };
   }
@@ -42,11 +45,13 @@ export class ChessTreeService {
    */
   public async step(fen: string, history: string[]): Promise<string> {
     const rootNode = await this.initRootNode();
+    Logger.log(`-hallo1.5, ${Object.keys(rootNode.forks)}`);
 
     const { restPath, foundPath } = await this.initNodeByHistory(
       rootNode,
       history,
     );
+    Logger.log(`-hallo1, ${Object.keys(rootNode.forks)}`);
     Logger.log(`step: restpath, ${restPath}`);
     Logger.log(`step: foundPath, ${foundPath}`);
 
@@ -54,17 +59,20 @@ export class ChessTreeService {
       // call AI
       return 'not implemented';
     } else {
-      const foundIndices = restPath.split(PATH_SEPARATOR);
+      const foundIndices = foundPath.split(PATH_SEPARATOR);
       Logger.log(`hallo1, ${foundIndices}`);
+      Logger.log(`hallo1.5, ${Object.keys(rootNode.forks)}`);
 
-      const { node } = this.sepatreeService.getForkAtPath(rootNode, foundPath);
-      const stepFork = node.forks[foundIndices[foundIndices.length - 1]];
-      if (!stepFork) {
-        //call AI
-        return 'not implemented';
-      }
+      const { node: lastNode, prefix } = this.sepatreeService.getForkAtPath(
+        rootNode,
+        foundPath,
+      );
+      Logger.log(`hallo1.6, ${Object.keys(lastNode.forks)}`);
+      // choose the best fork
+      const bestFork = lastNode.forks[Object.keys(lastNode.forks)[0]];
+      Logger.log(`hallo2, ${uint8ArrayToString(bestFork.prefix)}`);
 
-      return uint8ArrayToString(stepFork.prefix);
+      return uint8ArrayToString(bestFork.prefix);
     }
   }
 
@@ -121,7 +129,7 @@ export class ChessTreeService {
 
     const rootHash = await this.sepatreeService.saveNode(rootNode);
     Logger.debug(`new node first levels keys: ${Object.keys(rootNode.forks)}`);
-    this.updateTreeRootHash(uint8ArrayToString(rootHash));
+    this.updateTreeRootHash(bytesToHex(rootHash));
 
     //TODO aggregate with web3 service
   }
