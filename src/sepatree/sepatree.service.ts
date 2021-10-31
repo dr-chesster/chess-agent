@@ -47,7 +47,7 @@ export class SepatreeService {
     if (!rootNode.forks) return path;
 
     const pathIndices = path.split(PATH_SEPARATOR);
-    const node: SepaTreeNode = rootNode;
+    let node: SepaTreeNode = rootNode;
     for (let i = 0; pathIndices.length; i++) {
       const fork = node.forks[pathIndices[i]];
 
@@ -61,6 +61,8 @@ export class SepatreeService {
         this.getBytesAtReference.bind(this),
         fork.node.getEntry,
       );
+
+      node = fork.node;
     }
   }
 
@@ -90,11 +92,9 @@ export class SepatreeService {
   }
 
   public async saveNode(node: SepaTreeNode): Promise<ByteReference> {
-    Logger.log('VMASF0');
     const ref = await node.save(
       this.beeService.saveDataByteReference.bind(this.beeService),
     );
-    Logger.log('VMASF1');
 
     return ref;
   }

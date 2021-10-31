@@ -31,11 +31,9 @@ export class ChessTreeService {
     history: string[],
   ): Promise<{ restPath: string; foundPath: string }> {
     const path = this.getNodePathFromHistory(history);
-    Logger.log(`init path0 ${path}, ${Object.keys(node.forks)}`);
     const restPath = await this.sepatreeService.loadUntilPath(node, path);
 
     const foundPath = path.substr(0, path.length - restPath.length);
-    Logger.log(`init path1 ${path}, ${Object.keys(node.forks)}`);
 
     return { restPath, foundPath };
   }
@@ -45,32 +43,22 @@ export class ChessTreeService {
    */
   public async step(fen: string, history: string[]): Promise<string> {
     const rootNode = await this.initRootNode();
-    Logger.log(`-hallo1.5, ${Object.keys(rootNode.forks)}`);
 
     const { restPath, foundPath } = await this.initNodeByHistory(
       rootNode,
       history,
     );
-    Logger.log(`-hallo1, ${Object.keys(rootNode.forks)}`);
-    Logger.log(`step: restpath, ${restPath}`);
-    Logger.log(`step: foundPath, ${foundPath}`);
 
     if (restPath.length > 0) {
       // call AI
       return 'not implemented';
     } else {
-      const foundIndices = foundPath.split(PATH_SEPARATOR);
-      Logger.log(`hallo1, ${foundIndices}`);
-      Logger.log(`hallo1.5, ${Object.keys(rootNode.forks)}`);
-
-      const { node: lastNode, prefix } = this.sepatreeService.getForkAtPath(
+      const { node: lastNode } = this.sepatreeService.getForkAtPath(
         rootNode,
         foundPath,
       );
-      Logger.log(`hallo1.6, ${Object.keys(lastNode.forks)}`);
-      // choose the best fork
+      // TODO: choose the best fork
       const bestFork = lastNode.forks[Object.keys(lastNode.forks)[0]];
-      Logger.log(`hallo2, ${uint8ArrayToString(bestFork.prefix)}`);
 
       return uint8ArrayToString(bestFork.prefix);
     }
