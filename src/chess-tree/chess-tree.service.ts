@@ -1,4 +1,4 @@
-/* eslint-disable prettier/prettier */
+import { Utils } from '@ethersphere/bee-js';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { SepaTreeFork, SepaTreeNode } from 'sepatree';
@@ -6,6 +6,7 @@ import { stringToUint8Array, uint8ArrayToString } from 'src/utils';
 import { SepatreeService } from '../sepatree/sepatree.service';
 
 const PATH_SEPARATOR = '/';
+const { bytesToHex } = Utils;
 
 interface NodeMetadata {
   whiteWins: number;
@@ -30,7 +31,6 @@ export class ChessTreeService {
     history: string[],
   ): Promise<{ restPath: string; foundPath: string }> {
     const path = this.getNodePathFromHistory(history);
-    Logger.log(`init path ${path}`);
     const restPath = await this.sepatreeService.loadUntilPath(node, path);
 
     const foundPath = path.substr(0, path.length - restPath.length);
@@ -38,60 +38,57 @@ export class ChessTreeService {
     return { restPath, foundPath };
   }
 
-  public async getAIMove(fen:string){
-    const response = await  fetch('http://localhost:6969', {
-    method: 'POST',
-    body: JSON.stringify({
-      "FenString": fen
-    })
-  })
-  const jsonResponse = await response.json( )
-  Logger.log(`json response ${JSON.stringify(jsonResponse)}`)
+  public async getAIMove(fen: string) {
+    const response = await fetch('http://localhost:6969', {
+      method: 'POST',
+      body: JSON.stringify({
+        FenString: fen,
+      }),
+    });
+    const jsonResponse = await response.json();
+    Logger.log(`json response ${JSON.stringify(jsonResponse)}`);
 
-  return jsonResponse['AI Move']
-
-}
+    return jsonResponse['AI Move'];
+  }
   /**
    * Called when a step is needed to advised on a party.
    */
   public async step(fen: string, history: string[]): Promise<string> {
     const rootNode = await this.initRootNode();
 
-    // const { restPath, foundPath } = await this.initNodeByHistory(
-    //   rootNode,
-    //   history,
-    // );
-    // Logger.log(`step: restpath, ${restPath}`);
-    // Logger.log(`step: foundPath, ${foundPath}`);
+    const { restPath, foundPath } = await this.initNodeByHistory(
+      rootNode,
+      history,
+    );
 
-    if (true){ //(restPath.length > 0) {
+    if (restPath.length > 0) {
       // call AI
-      const AIMove = await this.getAIMove(fen)
-      
+      const AIMove = await this.getAIMove(fen);
+
       //CHECKMATE
-      if (AIMove.includes("#") || AIMove.includes("++") || AIMove.includes("=")) {
-        return AIMove+"|  --== ALL HAIL H.A.L. ==--  "
+      if (
+        AIMove.includes('#') ||
+        AIMove.includes('++') ||
+        AIMove.includes('=')
+      ) {
+        return AIMove + '|  --== ALL HAIL H.A.L. ==--  ';
       }
 
       //STALEMENT
-      if (AIMove.includes("stalemate")){
-        return AIMove+"|  --== ALL HAIL H.A.L. ==--  "
+      if (AIMove.includes('stalemate')) {
+        return AIMove + '|  --== ALL HAIL H.A.L. ==--  ';
       }
-      
+
       return AIMove;
     } else {
-      // const foundIndices = restPath.split(PATH_SEPARATOR);
-      // Logger.log(`hallo1, ${foundIndices}`);
+      const { node: lastNode } = this.sepatreeService.getForkAtPath(
+        rootNode,
+        foundPath,
+      );
+      // TODO: choose the best fork
+      const bestFork = lastNode.forks[Object.keys(lastNode.forks)[0]];
 
-      // const { node } = this.sepatreeService.getForkAtPath(rootNode, foundPath);
-      // const stepFork = node.forks[foundIndices[foundIndices.length - 1]];
-      // // if (!stepFork) {
-      // //   //call AI
-      // //   return 'not implemented';
-      // // }
-      
-      // // san step 
-      // return uint8ArrayToString(stepFork.prefix);
+      return uint8ArrayToString(bestFork.prefix);
     }
   }
 
@@ -100,7 +97,11 @@ export class ChessTreeService {
   /**
    * Called on checkmate
    */
-  public async updateTree(fen: string, history: string[], winner: 'w' | 'b' | 'd' | ' ') {
+  public async updateTree(
+    fen: string,
+    history: string[],
+    winner: 'w' | 'b' | 'd' | ' ',
+  ) {
     //const winner = this.calculateWinner(history);
 
     const rootNode = await this.initRootNode();
@@ -149,7 +150,7 @@ export class ChessTreeService {
 
     const rootHash = await this.sepatreeService.saveNode(rootNode);
     Logger.debug(`new node first levels keys: ${Object.keys(rootNode.forks)}`);
-    this.updateTreeRootHash(uint8ArrayToString(rootHash));
+    this.updateTreeRootHash(bytesToHex(rootHash));
 
     //TODO aggregate with web3 service
   }
@@ -176,16 +177,19 @@ export class ChessTreeService {
     return rootNode;
   }
 
-  private aggreateForkMetadata(fork: SepaTreeFork, winner: 'w' | 'b' | 'd' | ' '): void {
+  private aggreateForkMetadata(
+    fork: SepaTreeFork,
+    winner: 'w' | 'b' | 'd' | ' ',
+  ): void {
     const aggregatedMetadata: Partial<NodeMetadata> = {};
     if (winner === 'w') {
       aggregatedMetadata.whiteWins =
         1 + (Number(fork.node.getMetadata.whiteWins) || 0);
-    }else if (winner === 'b') {
+    } else if (winner === 'b') {
       aggregatedMetadata.blackWins =
         1 + (Number(fork.node.getMetadata.blackWins) || 0);
-    }else{
-      Logger.log("TODO")
+    } else {
+      Logger.log('TODO');
     }
 
     fork.node.setMetadata = {
@@ -194,21 +198,23 @@ export class ChessTreeService {
     };
   }
 
-  private initForkMetadata(winner: 'w' | 'b' | 'd' | ' '): Partial<NodeMetadata> {
+  private initForkMetadata(
+    winner: 'w' | 'b' | 'd' | ' ',
+  ): Partial<NodeMetadata> {
     const metadata: Partial<NodeMetadata> = {};
     if (winner === 'w') {
-      metadata['whiteWins'] = 1;}
+      metadata['whiteWins'] = 1;
+    }
     if (winner === 'b') {
-      metadata['blackWins'] = 1;}
+      metadata['blackWins'] = 1;
+    }
     // if (winner === 'd') {
     //   metadata['draws'] = 1;}
-    
-    
 
     return metadata;
   }
 
-  private calculateWinner(history: string[]):  'w' | 'b' | 'd' | ' ' {
+  private calculateWinner(history: string[]): 'w' | 'b' | 'd' | ' ' {
     // HÁT ÖÖÖÖ
     return history.length % 2 === 0 ? 'b' : 'w';
   }

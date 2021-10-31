@@ -1,10 +1,14 @@
+import { Utils } from '@ethersphere/bee-js';
 import { Injectable, Logger } from '@nestjs/common';
 import {
   Reference as ByteReference,
+  Reference,
   SepaTreeFork,
   SepaTreeNode
 } from 'sepatree';
 import { BeeService } from 'src/bee/bee.service';
+
+const { bytesToHex, hexToBytes } = Utils;
 
 const PATH_SEPARATOR = '/';
 
@@ -23,7 +27,7 @@ export class SepatreeService {
 
   public async getNodeAtReference(reference: string): Promise<SepaTreeNode> {
     const node = new SepaTreeNode();
-    const data = await this.getBytesAtReference(reference);
+    const data = await this.getBytesAtReference(hexToBytes(reference));
     node.deserialize(data);
 
     return node;
@@ -37,34 +41,29 @@ export class SepatreeService {
    * @returns remaining path that couldn't be loaded
    */
   public async loadUntilPath(
-    node: SepaTreeNode,
+    rootNode: SepaTreeNode,
     path: string,
   ): Promise<string> {
-    if (!node.forks) return path;
+    if (!rootNode.forks) return path;
 
     const pathIndices = path.split(PATH_SEPARATOR);
+    let node: SepaTreeNode = rootNode;
+    for (let i = 0; pathIndices.length; i++) {
+      const fork = node.forks[pathIndices[i]];
 
-    const fork = node.forks[pathIndices[0]];
+      if (!fork) return pathIndices.slice(i).join('/');
 
-    Logger.debug(
-      `Index: ${pathIndices[0]} ; fork ${fork} ; node keys: ${Object.keys(
-        node.forks,
-      )}`,
-    );
+      // load fork's node
+      const entry = fork.node.getEntry;
+      if (!entry) return pathIndices.slice(i).join('/');
 
-    if (!fork) return path;
+      await fork.node.load(
+        this.getBytesAtReference.bind(this),
+        fork.node.getEntry,
+      );
 
-    const rest = path.slice(fork.prefix.length);
-
-    // load fork's node
-    const entry = fork.node.getEntry;
-    if (!entry) return rest;
-
-    await node.load(this.getBytesAtReference.bind(this), entry);
-
-    if (rest.length === 0) return '';
-
-    return this.loadUntilPath(fork.node, rest);
+      node = fork.node;
+    }
   }
 
   public getForkAtPath(node: SepaTreeNode, path: string): SepaTreeFork {
@@ -93,11 +92,9 @@ export class SepatreeService {
   }
 
   public async saveNode(node: SepaTreeNode): Promise<ByteReference> {
-    Logger.log('VMASF0');
     const ref = await node.save(
       this.beeService.saveDataByteReference.bind(this.beeService),
     );
-    Logger.log('VMASF1');
 
     return ref;
   }
@@ -105,7 +102,7 @@ export class SepatreeService {
   /**
    * loadFunction
    */
-  private async getBytesAtReference(reference: string): Promise<Uint8Array> {
-    return this.beeService.loadData(reference);
+  private async getBytesAtReference(reference: Reference): Promise<Uint8Array> {
+    return this.beeService.loadData(bytesToHex(reference));
   }
 }

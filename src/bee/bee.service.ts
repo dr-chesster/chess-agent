@@ -1,9 +1,7 @@
 import { Bee, BeeDebug, Reference } from '@ethersphere/bee-js';
-import { Bytes } from '@ethersphere/bee-js/dist/src/utils/bytes';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Reference as ByteReference } from 'sepatree';
-import { stringToUint8Array } from 'src/utils';
+import { Bytes, Reference as ByteReference } from 'sepatree';
 
 @Injectable()
 export class BeeService {
@@ -30,7 +28,7 @@ export class BeeService {
   public async saveDataByteReference(data: Uint8Array): Promise<ByteReference> {
     const reference = await this.saveData(data);
 
-    return stringToUint8Array(reference) as Bytes<32>;
+    return Buffer.from(reference, 'hex') as Bytes<32>;
   }
 
   public async loadData(reference: string): Promise<Uint8Array> {
