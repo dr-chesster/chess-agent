@@ -6,6 +6,6 @@ export class ChessStateDto {
   })
   fen: string;
 
-  @ApiProperty({ example: ['e5', 'f4'] })
+  @ApiProperty({ example: ['e4', 'a5', 'Bc4', 'b6', 'Qf3', 'Na6', 'Qxf7#'] })
   history: string[];
 }

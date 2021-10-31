@@ -8,6 +8,6 @@ export function stringToUint8Array(value: string): Uint8Array {
   return new TextEncoder().encode(value);
 }
 
-export function Uint8ArrayToString(value: Uint8Array): string {
+export function uint8ArrayToString(value: Uint8Array): string {
   return new TextDecoder().decode(value);
 }
