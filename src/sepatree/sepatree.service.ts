@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { MantarayNode } from 'mantaray-js';
-import { findIndexOfArray } from 'mantaray-js/dist/utils';
+import { SepaTreeNode } from 'sepatree';
 import { BeeService } from 'src/bee/bee.service';
-import { stringToUint8Array } from '../utils';
+
+const PATH_SEPARATOR = '/'
 
 interface NodeSearchResult {
-  node: MantarayNode;
+  node: SepaTreeNode;
   prefix: string;
 }
 
@@ -13,8 +13,8 @@ interface NodeSearchResult {
 export class SepatreeService {
   public constructor(private beeService: BeeService) {}
 
-  public async getNodeAtReference(reference: string): Promise<MantarayNode> {
-    const node = new MantarayNode();
+  public async getNodeAtReference(reference: string): Promise<SepaTreeNode> {
+    const node = new SepaTreeNode();
     const data = await this.getBytesAtReference(reference);
     node.deserialize(data);
 
@@ -29,13 +29,14 @@ export class SepatreeService {
    * @returns remaining path that couldn't be loaded
    */
   public async loadUntilPath(
-    node: MantarayNode,
+    node: SepaTreeNode,
     path: string,
   ): Promise<string> {
     if (!node.forks) return path;
-    const bytePath = stringToUint8Array(path);
+    
+    const pathIndices = path.split(PATH_SEPARATOR)
 
-    const fork = node.forks[bytePath[0]];
+    const fork = node.forks[pathIndices[0]];
 
     if (!fork) return path;
 
@@ -56,7 +57,9 @@ export class SepatreeService {
     return this.loadUntilPath(fork.node, rest);
   }
 
-  public getForkWhenRestPathExclude();
+  public getFork(path: string); SepaTreeFork {
+
+  }
 
   /**
    * loadFunction
