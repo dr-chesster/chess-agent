@@ -95,8 +95,29 @@ export class ChessTreeService {
         rootNode,
         foundPath,
       );
-      // TODO: choose the best fork
-      const bestFork = lastNode.forks[Object.keys(lastNode.forks)[0]];
+      // choose the best fork
+      const agentIsWhite = (history.length + 1) % 2 === 1;
+      let bestFork: SepaTreeFork | undefined;
+      let maxWins = 0;
+      for (const forkIndex of Object.keys(lastNode.forks)) {
+        const fork = lastNode.forks[forkIndex];
+        const metadata: NodeMetadata = fork.node.getMetadata as any;
+        const whiteWins = metadata.whiteWins || 0;
+        const blackWins = metadata.blackWins || 0;
+        if (agentIsWhite && whiteWins > maxWins) {
+          maxWins = whiteWins;
+          bestFork = fork;
+        } else if (!agentIsWhite && blackWins > maxWins) {
+          maxWins = blackWins;
+          bestFork = fork;
+        }
+      }
+
+      if (!bestFork) {
+        // call AI
+        const AIMove = await this.getAIMove(fen);
+        return { step: AIMove, perpetrator: 'ai' };
+      }
 
       const step = uint8ArrayToString(bestFork.prefix);
       return {
