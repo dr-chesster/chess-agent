@@ -1,9 +1,12 @@
 import { Utils } from '@ethersphere/bee-js';
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ChessInstance } from 'chess-types';
+import { Chess } from 'chess.js';
 import { SepaTreeFork, SepaTreeNode } from 'sepatree';
 import { stringToUint8Array, uint8ArrayToString } from 'src/utils';
 import { SepatreeService } from '../sepatree/sepatree.service';
+import { ChessStep } from './interfaces/chess-state.dto';
 
 const PATH_SEPARATOR = '/';
 const { bytesToHex } = Utils;
@@ -38,7 +41,7 @@ export class ChessTreeService {
     return { restPath, foundPath };
   }
 
-  public async getAIMove(fen: string) {
+  public async getAIMove(fen: string): Promise<string> {
     const response = await fetch('http://localhost:6969', {
       method: 'POST',
       body: JSON.stringify({
@@ -53,7 +56,7 @@ export class ChessTreeService {
   /**
    * Called when a step is needed to advised on a party.
    */
-  public async step(fen: string, history: string[]): Promise<string> {
+  public async step(fen: string, history: string[]): Promise<ChessStep> {
     const rootNode = await this.initRootNode();
 
     const { restPath, foundPath } = await this.initNodeByHistory(
@@ -61,25 +64,32 @@ export class ChessTreeService {
       history,
     );
 
+    const lastStep = history[history.length - 1];
+    if (lastStep.includes('#')) {
+      await this.updateTree(history);
+
+      return;
+    }
+
     if (restPath.length > 0) {
       // call AI
       const AIMove = await this.getAIMove(fen);
 
       //CHECKMATE
-      if (
-        AIMove.includes('#') ||
-        AIMove.includes('++') ||
-        AIMove.includes('=')
-      ) {
-        return AIMove + '|  --== ALL HAIL H.A.L. ==--  ';
-      }
+      // if (
+      //   AIMove.includes('#') ||
+      //   AIMove.includes('++') ||
+      //   AIMove.includes('=')
+      // ) {
+      //   return AIMove + '|  --== ALL HAIL H.A.L. ==--  ';
+      // }
 
-      //STALEMENT
-      if (AIMove.includes('stalemate')) {
-        return AIMove + '|  --== ALL HAIL H.A.L. ==--  ';
-      }
+      // //STALEMENT
+      // if (AIMove.includes('stalemate')) {
+      //   return AIMove + '|  --== ALL HAIL H.A.L. ==--  ';
+      // }
 
-      return AIMove;
+      return { step: AIMove, perpetrator: 'ai' };
     } else {
       const { node: lastNode } = this.sepatreeService.getForkAtPath(
         rootNode,
@@ -88,7 +98,11 @@ export class ChessTreeService {
       // TODO: choose the best fork
       const bestFork = lastNode.forks[Object.keys(lastNode.forks)[0]];
 
-      return uint8ArrayToString(bestFork.prefix);
+      const step = uint8ArrayToString(bestFork.prefix);
+      return {
+        step,
+        perpetrator: 'agent',
+      };
     }
   }
 
@@ -97,12 +111,21 @@ export class ChessTreeService {
   /**
    * Called on checkmate
    */
-  public async updateTree(
-    fen: string,
-    history: string[],
-    winner: 'w' | 'b' | 'd' | ' ',
-  ) {
+  public async updateTree(history: string[]) {
     //const winner = this.calculateWinner(history);
+    const game: ChessInstance = new Chess();
+    for (const el of history) {
+      game.move(el);
+    }
+    let winner: 'w' | 'b' | 'd' | ' ' = ' ';
+    if (game.in_checkmate()) {
+      winner = game.history.length % 2 === 1 ? 'w' : 'b';
+    } else if (game.in_draw() || game.in_stalemate()) {
+      winner = 'd';
+    }
+    if (winner === ' ') {
+      throw new BadRequestException('The game is not finished yet.');
+    }
 
     const rootNode = await this.initRootNode();
 
@@ -212,10 +235,5 @@ export class ChessTreeService {
     //   metadata['draws'] = 1;}
 
     return metadata;
-  }
-
-  private calculateWinner(history: string[]): 'w' | 'b' | 'd' | ' ' {
-    // HÁT ÖÖÖÖ
-    return history.length % 2 === 0 ? 'b' : 'w';
   }
 }
